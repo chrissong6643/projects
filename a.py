@@ -10,8 +10,8 @@ from typing import List
 #         if len(s) % 2 == 0:
 #             c += 1
 #     return c
-#
-#
+
+
 # def solution2(elements: List[int]):
 #     if elements == sorted(elements):
 #         return 0
@@ -24,8 +24,8 @@ from typing import List
 #     if element_copy == sorted(elements):
 #         return shifts
 #     return -1
-#
-#
+
+
 # def solution3(bubbles: List[List[int]]):
 #     coordinatelist = []
 #     for i in range(len(bubbles)):
@@ -94,7 +94,6 @@ class ListNode:
 
 
 def deleteMiddle(head: ListNode) -> ListNode:
-    n = head
     l = []
     nl = None
     while n:
@@ -138,6 +137,8 @@ def __init__(self, val=0, left=None, right=None):
 #     s.pop()
 #     d.pop()
 # return "".join("U" * len(s)) + "".join(reversed(d))
+
+
 def checkRecord(s: str) -> bool:
     ac = 0
     lc = 0
@@ -208,3 +209,61 @@ def maxCount(m: int, n: int, ops: List[List[int]]) -> int:
             c = min(c, i[1])
         return r * c
     return m * n
+
+
+def threeSum(nums: List[int]) -> List[List[int]]:
+    res = []
+    nums.sort()
+    for i in range(len(nums) - 2):
+        if i > 0 and nums[i] == nums[i - 1]:
+            continue
+        l, r = i + 1, len(nums) - 1
+        while l < r:
+            s = nums[i] + nums[l] + nums[r]
+            if s < 0:
+                l += 1
+            elif s > 0:
+                r -= 1
+            else:
+                res.append((nums[i], nums[l], nums[r]))
+                while l < r and nums[l] == nums[l + 1]:
+                    l += 1
+                while l < r and nums[r] == nums[r - 1]:
+                    r -= 1
+                l += 1
+                r -= 1
+    return res
+
+
+from shapely.geometry import box
+
+
+def area(coords: List[int]):
+    ta = 0
+    for i in coords:
+        ta += ((i[2] - i[0]) * (i[3] - i[1]))
+    for i in range(len(coords)):
+        for j in range(i + 1, len(coords)):
+            ta -= int(box(coords[i][0], coords[i][1], coords[i][2], coords[i][3]).intersection(box(coords[j][0], coords[j][1], coords[j][2], coords[j][3])).area)
+    print(ta)
+
+
+temp = [None for i in range(30)]
+temp[0] = "h";
+temp[1] = "e";
+temp[2] = "l";
+temp[3] = "l";
+temp[4] = "o";
+id = 4
+add = 3
+for i in range(add):
+    for j in range(id, -1, -1):
+        temp[j + 1] = temp[j]
+        if j == 0:
+            temp[j + 1] = temp[j]
+            temp[j] = ' '
+            length += 1
+    id += 1
+    temp += " "
+    length += 1
+None
