@@ -16,6 +16,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 from torchsummary import summary
+from torchmetrics import Accuracy
 from cnn import CNNModel  # Assuming you have a CNNModel class in a 'model' module
 
 
@@ -24,7 +25,7 @@ from cnn import CNNModel  # Assuming you have a CNNModel class in a 'model' modu
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Neural Networks")
     parser.add_argument("-mode", dest="mode", type=str, default='train', help="train or test")
-    parser.add_argument("-num_epoches", dest="num_epoches", type=int, default=40, help="num of epoches")
+    parser.add_argument("-num_epoches", dest="num_epoches", type=int, default=3, help="num of epoches")
     parser.add_argument("-fc_hidden1", dest="fc_hidden1", type=int, default=100, help="dim of hidden neurons")
     parser.add_argument("-fc_hidden2", dest="fc_hidden2", type=int, default=100, help="dim of hidden neurons")
     parser.add_argument("-learning_rate", dest="learning_rate", type=float, default=0.001, help="learning rate")
@@ -75,12 +76,15 @@ def load_data(DATA_PATH, batch_size):
     # Create train and test datasets
     train_dataset = ImageFolder(root=f"{DATA_PATH}train", transform=train_trans)
     test_dataset = ImageFolder(root=f"{DATA_PATH}test", transform=test_trans)
+    validate_dataset = ImageFolder(root=f"{DATA_PATH}valid", transform=test_trans)
 
     # Create data loaders
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 
-    return train_loader, test_loader
+    validate_loader = DataLoader(dataset=validate_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    validate_loader = DataLoader(dataset=validate_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
+    return train_loader, test_loader, validate_loader
 
 
 def compute_accuracy(y_pred, y_batch):
@@ -95,8 +99,8 @@ def validate_model(model, val_loader, device):
     all_preds = []
     all_labels = []
     with torch.no_grad():
-        for x_batch, y_labels in val_loader:
-            x_batch, y_labels = x_batch.to(device), y_labels.to(device)
+        for batch_id, (x_batch, y_labels) in tqdm(enumerate(val_loader), desc="Validating", leave=False):
+            x_batch, y_labels = Variable(x_batch).to(device), Variable(y_labels).to(device)
             output_y = model(x_batch)
             loss = nn.CrossEntropyLoss()(output_y, y_labels)
             val_loss += loss.item()
@@ -149,12 +153,18 @@ def train_one_epoch(model, optimizer, train_loader, device):
 def test_model(model, test_loader, device):
     model.eval()
     total_accy = 0
+    vals = {}
     for batch_id, (x_batch, y_labels) in tqdm(enumerate(test_loader), desc="Testing", leave=False):
         x_batch, y_labels = Variable(x_batch).to(device), Variable(y_labels).to(device)
         output_y = model(x_batch)
         _, y_pred = torch.max(output_y.data, 1)
         accy = compute_accuracy(y_pred, y_labels)
         total_accy += accy
+        for label in y_labels:
+            vals[label.item()] = accy
+    for i in vals.keys():
+        print(f"Class: {i} Accuracy: {vals.get(i)}")
+
     return total_accy / len(test_loader)
 
 
@@ -166,9 +176,11 @@ def main():
     print(f"device: {device}")
 
     # Assignment_1/Convolutional_Neural_Networks/data
-    train_loader, test_loader = load_data("/Users/admin/CMSC421-FALL23-Students/Assignment_1/Convolutional_Neural_Networks/data/", args.batch_size)
+    train_loader, test_loader, validate_loader = load_data("/Users/admin/CMSC421-FALL23-Students/Assignment_1/Convolutional_Neural_Networks/data/", args.batch_size)
 
     model = CNNModel(args=args).to(device)
+
+    print("--------------------------ADAM--------------------------")
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
@@ -179,6 +191,25 @@ def main():
         print(f"Epoch {epoch + 1}, Test Accuracy: {test_accuracy}")
 
         # Optionally, save model checkpoint here
+    loss, accuracy, confusion, precision, recall, f1 = validate_model(model, validate_loader, device)
+    print(f"loss: {loss} accuracy: {accuracy} confusion matrix: {confusion} precision: {precision} recall: {recall} f1: {f1}")
+
+    print("--------------------------RMS PROP--------------------------")
+
+    optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate)
+
+    for epoch in range(args.num_epoches):
+        adjust_learning_rate(args.learning_rate, optimizer, epoch, args.decay)
+        train_one_epoch(model, optimizer, train_loader, device)
+        test_accuracy = test_model(model, test_loader, device)
+        print(f"Epoch {epoch + 1}, Test Accuracy: {test_accuracy}")
+
+        # Optionally, save model checkpoint here
+    loss, accuracy, confusion, precision, recall, f1 = validate_model(model, validate_loader, device)
+    print(f"loss: {loss} accuracy: {accuracy} confusion matrix: {confusion} precision: {precision} recall: {recall} f1: {f1}")
+
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Number of parameters: {total_params}")
 
     print("Training Complete!")
 
